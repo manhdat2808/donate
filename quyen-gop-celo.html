@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Quyên góp tiền CELO</title>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.13.2/dist/ethers.umd.min.js"></script>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      background: #f0f8ff; color: #000;
+      padding: 20px; line-height: 1.6;
+    }
+    .container { max-width: 500px; margin: 40px auto; text-align: center; }
+    h1 { font-size: 2.2rem; margin-bottom: 10px; color: #1a5fb4; }
+    p { margin-bottom: 20px; opacity: 0.9; font-size: 1.1rem; }
+
+    .card {
+      background: #ffffff; border: 3px solid #1a5fb4;
+      border-radius: 20px; padding: 28px; margin: 20px 0;
+      box-shadow: 0 4px 12px rgba(26, 95, 180, 0.1);
+    }
+    input, button {
+      width: 100%; padding: 16px; margin: 12px 0;
+      border: 2px solid #1a5fb4; border-radius: 12px;
+      font-size: 1.1rem;
+    }
+    button {
+      background: #1a5fb4; color: #fff; font-weight: bold;
+      cursor: pointer; font-size: 1.2rem;
+    }
+    button:disabled { background: #aaa; cursor: not-allowed; }
+
+    .status { margin: 15px 0; font-weight: 600; font-size: 1.1rem; }
+    .success { color: #2e7d32; }
+    .error { color: #c62828; }
+
+    .balance {
+      font-size: 1.3rem; margin: 15px 0; font-weight: bold; color: #1a5fb4;
+    }
+    .note {
+      font-size: 0.9rem; color: #555; margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Quyên góp tiền CELO</h1>
+    <p>Gửi CELO miễn phí (testnet) đến bất kỳ ví nào</p>
+
+    <div class="card">
+      <div class="balance" id="balance">Số dư: Đang tải...</div>
+
+      <input type="text" id="to" placeholder="Địa chỉ ví nhận (0x...)" />
+      <input type="number" step="0.001" id="amount" placeholder="Số CELO (VD: 0.5)" />
+      <button id="sendBtn">Gửi ngay</button>
+
+      <div class="status" id="status"></div>
+    </div>
+
+    <p class="note">
+      <strong>Lưu ý:</strong> Đây là CELO trên mạng <strong>Celo Sepolia (testnet)</strong> – hoàn toàn miễn phí!<br>
+      Dùng để thử nghiệm, không có giá trị thật.
+    </p>
+
+    <p><small>Powered by Celo Sepolia</small></p>
+  </div>
+
+  <script>
+    let provider, signer, userAddress;
+
+    async function connectWallet() {
+      if (!window.ethereum) {
+        showStatus("Cài MetaMask hoặc Valora!", "error");
+        return false;
+      }
+      try {
+        showStatus("Đang kết nối ví...", "success");
+        provider = new ethers.BrowserProvider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+        userAddress = await signer.getAddress();
+        showStatus(`Đã kết nối: ${userAddress.slice(0,6)}...${userAddress.slice(-4)}`, "success");
+        updateBalance();
+        setInterval(updateBalance, 10000);
+        return true;
+      } catch (e) {
+        showStatus("Lỗi kết nối: " + e.message, "error");
+        return false;
+      }
+    }
+
+    async function updateBalance() {
+      if (!signer) return;
+      try {
+        const balance = await provider.getBalance(userAddress);
+        const celo = parseFloat(ethers.formatEther(balance)).toFixed(6);
+        document.getElementById("balance").innerText = `Số dư: ${celo} CELO`;
+      } catch (e) {
+        document.getElementById("balance").innerText = "Lỗi tải số dư";
+      }
+    }
+
+    document.getElementById("sendBtn").onclick = async () => {
+      if (!signer) {
+        if (!(await connectWallet())) return;
+      }
+
+      const to = document.getElementById("to").value.trim();
+      const amount = document.getElementById("amount").value;
+
+      if (!ethers.isAddress(to)) return showStatus("Địa chỉ ví không hợp lệ!", "error");
+      if (!amount || parseFloat(amount) <= 0) return showStatus("Nhập số CELO hợp lệ!", "error");
+
+      try {
+        showStatus("Đang gửi CELO...", "success");
+        const tx = await signer.sendTransaction({
+          to: to,
+          value: ethers.parseEther(amount)
+        });
+        await tx.wait();
+        showStatus("Gửi thành công! CELO đã đến ví.", "success");
+        document.getElementById("amount").value = "";
+        updateBalance();
+      } catch (e) {
+        showStatus("Lỗi gửi: " + e.message.split("(")[0], "error");
+      }
+    };
+
+    function showStatus(msg, type) {
+      const el = document.getElementById("status");
+      el.innerHTML = `<span class="${type}">${msg}</span>`;
+    }
+
+    // TỰ ĐỘNG KẾT NỐI KHI MỞ TRANG
+    window.onload = connectWallet;
+  </script>
+</body>
+</html>
